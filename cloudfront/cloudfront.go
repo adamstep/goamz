@@ -87,10 +87,15 @@ func (cf *CloudFront) generateSignature(policy []byte) (string, error) {
 func (cf *CloudFront) CannedSignedURL(path, queryString string, expires time.Time) (string, error) {
 	resource := cf.BaseURL + path
 	if queryString != "" {
-		resource = path + "?" + queryString
+		resource += "?" + queryString
 	}
 
-	policy, err := buildPolicy(resource, expires)
+	uri, err := url.Parse(resource)
+	if err != nil {
+		return "", err
+	}
+
+	policy, err := buildPolicy(uri.String(), expires)
 	if err != nil {
 		return "", err
 	}
@@ -100,20 +105,12 @@ func (cf *CloudFront) CannedSignedURL(path, queryString string, expires time.Tim
 		return "", err
 	}
 
-	// TOOD: Do this once
-	uri, err := url.Parse(cf.BaseURL)
-	if err != nil {
-		return "", err
-	}
-
-	uri.RawQuery = queryString
-	if queryString != "" {
+	if uri.RawQuery != "" {
 		uri.RawQuery += "&"
 	}
 
 	expireTime := expires.Truncate(time.Millisecond).Unix()
 
-	uri.Path = path
 	uri.RawQuery += fmt.Sprintf("Expires=%d&Signature=%s&Key-Pair-Id=%s", expireTime, signature, cf.keyPairId)
 
 	return uri.String(), nil
